@@ -23,10 +23,13 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 seen_ads = load_seen_ads()
 
-@tasks.loop(minutes=config["check_interval"])
-async def check_vinted():
+# --- Fonction principale pour vérifier les annonces ---
+async def check_vinted_func():
     global seen_ads
     channel = bot.get_channel(int(config["channel_id"]))
+    if channel is None:
+        print("Erreur : Canal Discord introuvable. Vérifie l'ID du canal.")
+        return
     for keyword in config["keywords"]:
         market_price = get_market_price(keyword)
         ads = search_vinted(keyword)
@@ -38,6 +41,18 @@ async def check_vinted():
                 seen_ads.add(ad.link)
     save_seen_ads(seen_ads)
 
+# --- Tâche automatique toutes les X minutes ---
+@tasks.loop(minutes=config["check_interval"])
+async def check_vinted():
+    await check_vinted_func()
+
+# --- Commande Discord pour tester manuellement ---
+@bot.command()
+async def testcheck(ctx):
+    await check_vinted_func()
+    await ctx.send("✅ Check Vinted manuel terminé !")
+
+# --- Événement Ready ---
 @bot.event
 async def on_ready():
     print(f"{bot.user} est connecté !")
