@@ -19,6 +19,7 @@ config["discord_token"] = os.environ.get("DISCORD_TOKEN")
 
 # --- Discord ---
 intents = discord.Intents.default()
+intents.message_content = True  # Permet de lire les messages pour les commandes
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 seen_ads = load_seen_ads()
