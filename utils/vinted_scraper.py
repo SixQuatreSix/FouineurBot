@@ -1,36 +1,73 @@
 # utils/vinted_scraper.py
-import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
 from models.ad import Ad
+import time
 
-BASE_URL = "https://www.vinted.fr/api/v2/catalog/items"
+def search_vinted(keyword, max_items=50):
+    """
+    Scrape les annonces Vinted via Selenium.
+    Retourne une liste d'objets Ad.
+    """
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    
+    url = f"https://www.vinted.fr/catalog?search_text={keyword}"
+    driver.get(url)
+    
+    wait = WebDriverWait(driver, 10)
+    try:
+        wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.feed-grid__item-content")))
+    except:
+        print(f"❌ Impossible de charger les annonces pour {keyword}")
+        driver.quit()
+        return []
 
-def search_vinted(keyword):
-    """
-    Scrape les annonces via l'API JSON interne.
-    Retourne une liste d'objets Ad pour les vendeurs avec au moins 1 avis.
-    """
-    params = {"search_text": keyword, "per_page": 50, "page": 1}
-    headers = {"User-Agent": "Mozilla/5.0"}
-    
-    response = requests.get(BASE_URL, params=params, headers=headers)
-    data = response.json()
-    
     ads = []
-    for item in data.get("items", []):
+    product_divs = driver.find_elements(By.CSS_SELECTOR, "div.feed-grid__item-content")
+    
+    for div in product_divs[:max_items]:
         try:
-            seller_reviews = item["user"]["feedback_count"]
-            if seller_reviews < 1:
-                continue
-            
-            title = item["title"]
-            price = float(item["price"])
-            photo_url = item["photos"][0]["url"] if item.get("photos") else ""
-            seller = item["user"]["login"]
-            link = "https://www.vinted.fr" + item["url"]
-            
-            ads.append(Ad(title, price, photo_url, seller, seller_reviews, link))
-        except Exception:
+            link_elem = div.find_element(By.CSS_SELECTOR, "a")
+            link = link_elem.get_attribute("href")
+
+            title_elem = div.find_element(By.CSS_SELECTOR, "div.web_ui__Cell__content")
+            title = title_elem.text.strip()
+
+            price_elem = div.find_element(By.XPATH, ".//div[contains(text(),'€')]")
+            price = float(price_elem.text.replace("€","").replace(",","").strip())
+
+            try:
+                img_elem = div.find_element(By.CSS_SELECTOR, "div.new-item-box__image img")
+                photo_url = img_elem.get_attribute("src")
+            except:
+                img_elem = div.find_element(By.CSS_SELECTOR, "div.new-item-box__image")
+                style = img_elem.get_attribute("style")
+                photo_url = style.split('url("')[1].split('")')[0] if 'url("' in style else ""
+
+            try:
+                seller_elem = div.find_element(By.CSS_SELECTOR, "div.feed-grid__user-info")
+                seller_name = seller_elem.text.strip()
+                seller_reviews = 1  # On ne récupère pas exactement le nombre d'avis, mais minimum 1
+            except:
+                seller_name = "Inconnu"
+                seller_reviews = 0
+
+            ad = Ad(title, price, photo_url, seller_name, seller_reviews, link)
+            ads.append(ad)
+        except Exception as e:
+            print(f"[DEBUG] Erreur sur une annonce : {e}")
             continue
+
+    driver.quit()
     return ads
 
 def get_market_price(keyword):

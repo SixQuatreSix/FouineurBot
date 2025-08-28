@@ -3,3 +3,5 @@ requests
 aiohttp
 pandas
 flask
+selenium
+webdriver-manager
