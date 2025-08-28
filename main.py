@@ -1,6 +1,8 @@
 # main.py
 import asyncio
 import json
+import subprocess
+import sys
 import discord
 import os
 from discord.ext import tasks, commands
@@ -9,6 +11,9 @@ from utils.db_handler import load_seen_ads, save_seen_ads
 from utils.discord_notifier import send_to_discord
 from flask import Flask
 import threading
+
+# --- Installer Playwright et ses navigateurs si nécessaire ---
+subprocess.run([sys.executable, "-m", "playwright", "install"], check=True)
 
 # --- Config ---
 with open("config.json") as f:
@@ -33,11 +38,15 @@ async def check_vinted_func():
         return
 
     for keyword in config["keywords"]:
-        ads = search_vinted(keyword)
-        print(f"[DEBUG] {len(ads)} annonces trouvées pour '{keyword}'")
+        try:
+            ads = await search_vinted(keyword)
+            print(f"[DEBUG] {len(ads)} annonces trouvées pour '{keyword}'")
 
-        market_price = get_market_price(keyword)
-        print(f"[DEBUG] Prix moyen pour '{keyword}' : {market_price}")
+            market_price = await get_market_price(keyword)
+            print(f"[DEBUG] Prix moyen pour '{keyword}' : {market_price}")
+        except Exception as e:
+            print(f"[ERROR] Erreur scraping pour '{keyword}' : {e}")
+            continue
 
         for ad in ads:
             margin = (market_price - ad.price) / market_price * 100 if market_price > 0 else 0
