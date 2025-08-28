@@ -1,0 +1,7 @@
+{
+    "discord_token": "",
+    "channel_id": "1410458395810599065",
+    "keywords": ["Nike", "iPhone", "North Face"],
+    "check_interval": 10,
+    "profit_threshold": 25
+  }  
