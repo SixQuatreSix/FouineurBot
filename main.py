@@ -29,17 +29,28 @@ async def check_vinted_func():
     global seen_ads
     channel = bot.get_channel(int(config["channel_id"]))
     if channel is None:
-        print("Erreur : Canal Discord introuvable. Vérifie l'ID du canal.")
+        print("❌ Erreur : Canal Discord introuvable ! Vérifie l'ID du canal et les permissions du bot.")
         return
+
     for keyword in config["keywords"]:
-        market_price = get_market_price(keyword)
         ads = search_vinted(keyword)
+        print(f"[DEBUG] {len(ads)} annonces trouvées pour '{keyword}'")
+
+        market_price = get_market_price(keyword)
+        print(f"[DEBUG] Prix moyen pour '{keyword}' : {market_price}")
+
         for ad in ads:
-            if ad.link not in seen_ads:
-                margin = (market_price - ad.price) / market_price * 100 if market_price > 0 else 0
-                if margin >= config["profit_threshold"]:
+            margin = (market_price - ad.price) / market_price * 100 if market_price > 0 else 0
+            print(f"[DEBUG] {ad.title} : prix {ad.price}, marge {margin:.2f}%")
+
+            if ad.link not in seen_ads and margin >= config["profit_threshold"]:
+                print(f"[DEBUG] Envoi de l'annonce : {ad.title}")
+                try:
                     await send_to_discord(channel, ad, market_price, margin)
+                except Exception as e:
+                    print(f"[ERROR] Impossible d'envoyer l'annonce : {e}")
                 seen_ads.add(ad.link)
+
     save_seen_ads(seen_ads)
 
 # --- Tâche automatique toutes les X minutes ---
